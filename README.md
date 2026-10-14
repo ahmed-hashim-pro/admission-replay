@@ -110,12 +110,12 @@ You need Go 1.24 or newer.
 ```bash
 git clone https://github.com/ahmed-hashim-pro/admission-replay.git
 cd admission-replay
-make build                       # a static binary, ./admission-replay
+make build                       # a static binary, ./admission-replay; ~3 min cold (Kubernetes libraries)
 
 ./admission-replay compare examples/audit.log examples/policies/*.yaml --bad examples/bad.txt
 ./admission-replay replay examples/audit.log examples/policies/strict-baseline.yaml --bad examples/bad.txt
 ./admission-replay check examples/policies/targeted.yaml
-make test                        # about a minute the first time, most of it compiling
+make test                        # ~3 min the first time, mostly compiling; seconds after that
 ```
 
 With Docker and no Go installed, build it in a container. The binary is
