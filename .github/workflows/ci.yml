@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.24", stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go vet ./...
+      - run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go test -race ./...
+
+  # The README quotes the CLI's real output from docs/*.txt; it must be current.
+  docs-fresh:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: make docs
+      - run: git diff --exit-code -- docs
+
+  # The claim the tool rests on: for every write in the example log and every
+  # candidate policy, a real kube-apiserver (kind, Kubernetes 1.34) reaches
+  # the same verdict admission-replay does.
+  crosscheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Install kind
+        run: |
+          curl -fsSLo kind https://github.com/kubernetes-sigs/kind/releases/download/v0.30.0/kind-linux-amd64
+          sudo install kind /usr/local/bin/kind
+      - run: make crosscheck
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crosscheck-logs
+          path: build/crosscheck-*

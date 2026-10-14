@@ -1,0 +1,42 @@
+# Only one rule: every image, in every workload kind, comes from a registry
+# we trust: ours, or the upstream projects the platform team runs.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: registry-allowlist
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "daemonsets", "statefulsets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["cronjobs"]
+  variables:
+    - name: pod
+      expression: >-
+        object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec
+    - name: containers
+      expression: >-
+        variables.pod.containers +
+        (has(variables.pod.initContainers) ? variables.pod.initContainers : [])
+    - name: trusted
+      expression: >-
+        ['registry.example.com/', 'registry.k8s.io/ingress-nginx/', 'quay.io/jetstack/', 'quay.io/prometheus/']
+  validations:
+    - expression: variables.containers.all(c, variables.trusted.exists(r, c.image.startsWith(r)))
+      messageExpression: >-
+        'image ' + variables.containers.filter(c, !variables.trusted.exists(r, c.image.startsWith(r)))[0].image +
+        ' is not from a trusted registry'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: registry-allowlist
+spec:
+  policyName: registry-allowlist
+  validationActions: [Deny]

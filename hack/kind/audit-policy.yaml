@@ -1,0 +1,19 @@
+# What the example's API server records: every write to the resources
+# admission policies usually guard, with request and response bodies.
+# Reads, subresources (status, scale) and events are left out.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages: ["RequestReceived", "ResponseStarted"]
+rules:
+  - level: RequestResponse
+    verbs: ["create", "update", "patch", "delete"]
+    resources:
+      - group: ""
+        resources: ["namespaces", "services", "configmaps", "serviceaccounts"]
+      - group: "apps"
+        resources: ["deployments", "daemonsets", "statefulsets"]
+      - group: "batch"
+        resources: ["cronjobs"]
+      - group: "networking.k8s.io"
+        resources: ["ingresses", "networkpolicies"]
+  - level: None

@@ -1,0 +1,5 @@
+# Writes in examples/audit.log that should never have been admitted.
+# <audit ID>  <what it was>
+5e9a005a-0000-4000-8000-00000000005a  payments hotfix image from a personal Docker Hub account
+5e9a0081-0000-4000-8000-000000000081  log-shipper DaemonSet made privileged with the host's / mounted read-write
+5e9a00a6-0000-4000-8000-0000000000a6  checkout gets a privileged init container (sysctl tweak)

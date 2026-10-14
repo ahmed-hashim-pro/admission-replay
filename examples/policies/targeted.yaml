@@ -1,0 +1,125 @@
+# Deny the few things that let a workload out of its box, in every place a
+# container can hide; trust only known registries; warn, not deny, on
+# missing limits, so teams fix them without being stopped mid-deploy.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: no-host-escape
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "daemonsets", "statefulsets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["cronjobs"]
+  variables:
+    - name: pod
+      expression: >-
+        object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec
+    - name: containers
+      expression: >-
+        variables.pod.containers +
+        (has(variables.pod.initContainers) ? variables.pod.initContainers : []) +
+        (has(variables.pod.ephemeralContainers) ? variables.pod.ephemeralContainers : [])
+  validations:
+    - expression: >-
+        variables.containers.all(c, !has(c.securityContext) ||
+        !has(c.securityContext.privileged) || !c.securityContext.privileged)
+      messageExpression: >-
+        'container ' + variables.containers.filter(c, has(c.securityContext) &&
+        has(c.securityContext.privileged) && c.securityContext.privileged)[0].name + ' is privileged'
+    - expression: >-
+        !has(variables.pod.volumes) ||
+        variables.pod.volumes.filter(v, has(v.hostPath)).all(v,
+          variables.containers.all(c, !has(c.volumeMounts) ||
+            c.volumeMounts.all(m, m.name != v.name || (has(m.readOnly) && m.readOnly))))
+      message: hostPath volumes must be mounted read-only
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: trusted-images
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "daemonsets", "statefulsets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["cronjobs"]
+  variables:
+    - name: pod
+      expression: >-
+        object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec
+    - name: containers
+      expression: >-
+        variables.pod.containers +
+        (has(variables.pod.initContainers) ? variables.pod.initContainers : []) +
+        (has(variables.pod.ephemeralContainers) ? variables.pod.ephemeralContainers : [])
+    - name: trusted
+      expression: >-
+        ['registry.example.com/', 'registry.k8s.io/ingress-nginx/', 'quay.io/jetstack/', 'quay.io/prometheus/']
+  validations:
+    - expression: variables.containers.all(c, variables.trusted.exists(r, c.image.startsWith(r)))
+      messageExpression: >-
+        'image ' + variables.containers.filter(c, !variables.trusted.exists(r, c.image.startsWith(r)))[0].image +
+        ' is not from a trusted registry'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: resource-limits
+spec:
+  failurePolicy: Ignore
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments", "daemonsets", "statefulsets"]
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["cronjobs"]
+  variables:
+    - name: pod
+      expression: >-
+        object.kind == 'CronJob' ? object.spec.jobTemplate.spec.template.spec : object.spec.template.spec
+  validations:
+    - expression: >-
+        variables.pod.containers.all(c, has(c.resources) && has(c.resources.limits) &&
+        'cpu' in c.resources.limits && 'memory' in c.resources.limits)
+      message: every container should have CPU and memory limits
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: no-host-escape
+spec:
+  policyName: no-host-escape
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: trusted-images
+spec:
+  policyName: trusted-images
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: resource-limits
+spec:
+  policyName: resource-limits
+  validationActions: [Warn, Audit]

@@ -1,0 +1,15 @@
+$ admission-replay compare examples/audit.log examples/policies/*.yaml --bad examples/bad.txt
+examples/audit.log: 198 writes from 2026-09-01 to 2026-09-30 (29.2 days), 3 labelled bad
+
+     policy              bad caught  legit blocked  by controllers  warned  skipped
+  1  targeted                   3/3              0               0      21        0
+  2  registry-allowlist         1/3              0               0       0        0
+  3  strict-baseline            1/3             26               0       0        0
+
+ranked by bad writes caught, then legitimate writes blocked, then warnings.
+
+let through:
+  registry-allowlist  log-shipper DaemonSet made privileged with the host's / mounted read-write
+                      checkout gets a privileged init container (sysctl tweak)
+  strict-baseline     log-shipper DaemonSet made privileged with the host's / mounted read-write
+                      checkout gets a privileged init container (sysctl tweak)

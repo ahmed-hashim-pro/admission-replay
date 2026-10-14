@@ -1,0 +1,5 @@
+$ admission-replay check examples/policies/targeted.yaml
+examples/policies/targeted.yaml: 3 policies, 3 bindings, every expression compiles
+  binding no-host-escape -> policy no-host-escape (Deny)
+  binding trusted-images -> policy trusted-images (Deny)
+  binding resource-limits -> policy resource-limits (Warn, Audit)

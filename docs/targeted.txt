@@ -1,0 +1,21 @@
+$ admission-replay replay examples/audit.log examples/policies/targeted.yaml --bad examples/bad.txt --show caught --fail-on-block --fail-on-miss
+examples/audit.log: 198 writes from 2026-09-01 to 2026-09-30 (29.2 days), 3 labelled bad
+targeted: binding no-host-escape -> policy no-host-escape (Deny)
+targeted: binding trusted-images -> policy trusted-images (Deny)
+targeted: binding resource-limits -> policy resource-limits (Warn, Audit)
+
+CAUGHT 3 of 3 bad writes
+  2026-09-12 22:47  alice      update deployments shop-prod/payments
+      labelled bad: payments hotfix image from a personal Docker Hub account
+      trusted-images: image docker.io/alice-dev/payments:hotfix-2 is not from a trusted registry
+      audit ID 5e9a005a-0000-4000-8000-00000000005a
+  2026-09-19 03:12  bob        update daemonsets monitoring/log-shipper
+      labelled bad: log-shipper DaemonSet made privileged with the host's / mounted read-write
+      no-host-escape: container shipper is privileged
+      no-host-escape: hostPath volumes must be mounted read-only
+      audit ID 5e9a0081-0000-4000-8000-000000000081
+  2026-09-26 16:05  bob        update deployments shop-prod/checkout
+      labelled bad: checkout gets a privileged init container (sysctl tweak)
+      no-host-escape: container sysctl is privileged
+      audit ID 5e9a00a6-0000-4000-8000-0000000000a6
+

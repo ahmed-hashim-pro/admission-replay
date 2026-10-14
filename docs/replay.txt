@@ -1,0 +1,41 @@
+$ admission-replay replay examples/audit.log examples/policies/strict-baseline.yaml --bad examples/bad.txt --limit 3
+examples/audit.log: 198 writes from 2026-09-01 to 2026-09-30 (29.2 days), 3 labelled bad
+strict-baseline: binding strict-baseline -> policy strict-baseline (Deny)
+
+BLOCKED 26 legitimate writes
+  2026-09-01 10:12  ci-deploy  create deployments shop-staging/search
+      strict-baseline: every container needs CPU and memory limits
+      audit ID 5e9a0011-0000-4000-8000-000000000011
+  2026-09-01 15:00  dana       create deployments platform/ingress-proxy
+      strict-baseline: images must come from registry.example.com
+      strict-baseline: pods must run as non-root
+      audit ID 5e9a0023-0000-4000-8000-000000000023
+  2026-09-01 15:10  dana       create deployments platform/cert-renewer
+      strict-baseline: images must come from registry.example.com
+      audit ID 5e9a0024-0000-4000-8000-000000000024
+  ... 23 more (--limit 0 lists them all)
+  by user:
+      17  ci-deploy
+       5  dana
+       4  carol
+  by failed validation:
+      21  every container needs CPU and memory limits
+       5  images must come from registry.example.com
+       3  pods must run as non-root
+
+LET THROUGH 2 of 3 bad writes
+  2026-09-19 03:12  bob        update daemonsets monitoring/log-shipper
+      labelled bad: log-shipper DaemonSet made privileged with the host's / mounted read-write
+      admitted: no validation failed
+      audit ID 5e9a0081-0000-4000-8000-000000000081
+  2026-09-26 16:05  bob        update deployments shop-prod/checkout
+      labelled bad: checkout gets a privileged init container (sysctl tweak)
+      admitted: no validation failed
+      audit ID 5e9a00a6-0000-4000-8000-0000000000a6
+
+CAUGHT 1 of 3 bad writes
+  2026-09-12 22:47  alice      update deployments shop-prod/payments
+      labelled bad: payments hotfix image from a personal Docker Hub account
+      strict-baseline: images must come from registry.example.com
+      audit ID 5e9a005a-0000-4000-8000-00000000005a
+
